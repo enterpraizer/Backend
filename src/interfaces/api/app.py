@@ -2,6 +2,7 @@ import logging
 import traceback
 
 from fastapi import FastAPI, Depends, status, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +27,15 @@ from src.application.services.quota_service import QuotaExceededError
 from src.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Suppress noisy full tracebacks from Starlette for expected HTTP errors (4xx).
+# The error is still returned correctly to the client; we just don't need a wall
+# of stack frames in logs for things like expired tokens.
+class _SuppressHTTPExceptions(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "HTTPException" not in record.getMessage()
+
+logging.getLogger("uvicorn.error").addFilter(_SuppressHTTPExceptions())
 
 app = FastAPI()
 
@@ -74,6 +84,11 @@ async def user_already_exists_handler(request: Request, exc: UserAlreadyExistsEr
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
 @app.exception_handler(Exception)

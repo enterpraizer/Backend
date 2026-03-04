@@ -76,7 +76,10 @@ class AuthService:
         )
 
     async def refresh(self, token: RefreshToken) -> Tokens:
-        payload = await self.decode_refresh_token(token.refresh_token)
+        try:
+            payload = await self.decode_refresh_token(token.refresh_token)
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Token expired or invalid")
         username = payload.get('sub')
 
         user = await self._user_service.get(User.username == username)
@@ -121,7 +124,10 @@ class AuthService:
 
     @staticmethod
     async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> UserRequest:
-        payload = await AuthService.decode_access_token(token)
+        try:
+            payload = await AuthService.decode_access_token(token)
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Token expired or invalid")
 
         username: str = payload.get('sub')
         user_id: str = payload.get('id')
@@ -181,17 +187,11 @@ class AuthService:
 
     @staticmethod
     async def decode_access_token(token: str):
-        try:
-            return jwt.decode(token, settings.app.secret_key, algorithms=[settings.app.algorithm])
-        except JWTError:
-            raise HTTPException(status_code=401, detail="Token expired or invalid")
+        return jwt.decode(token, settings.app.secret_key, algorithms=[settings.app.algorithm])
 
     @staticmethod
     async def decode_refresh_token(token: str):
-        try:
-            return jwt.decode(token, settings.app.refresh_secret_key, algorithms=[settings.app.algorithm])
-        except JWTError:
-            raise HTTPException(status_code=401, detail="Token expired or invalid")
+        return jwt.decode(token, settings.app.refresh_secret_key, algorithms=[settings.app.algorithm])
 
     @property
     def user_service(self):
