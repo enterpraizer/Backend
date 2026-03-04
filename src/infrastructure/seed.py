@@ -1,7 +1,3 @@
-"""
-Seed script: creates admin user, demo tenant, quota, and 2 demo VMs.
-Run via: python -m src.infrastructure.seed
-"""
 import asyncio
 import uuid
 from datetime import datetime
@@ -16,7 +12,6 @@ from src.infrastructure.models.resource_quota import ResourceQuota
 from src.infrastructure.models.resource_usage import ResourceUsage
 from src.infrastructure.models.virtual_machine import VirtualMachine, VMStatus
 
-# bcrypt hash for password "Admin1234!" — pre-computed to avoid runtime dep on passlib
 ADMIN_PASSWORD_HASH = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36q8F1/DQnTRPTwS.sBB6Ge"
 
 ADMIN_EMAIL = "admin@cloudiaas.local"

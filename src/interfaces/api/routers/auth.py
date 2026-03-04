@@ -76,8 +76,9 @@ async def read_current_user(
         service: AuthService = Depends(get_auth_service)
 ) -> UserResponse:
     try:
-        request_user = await service.user_service.get(User.email == request_user.email)
-        return request_user
+        user = await service.user_service.get(User.email == request_user.email)
+        user_response = UserResponse.model_validate(user, from_attributes=True)
+        return user_response.model_copy(update={'tenant_id': request_user.tenant_id})
     except exceptions.UserValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
 

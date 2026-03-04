@@ -66,7 +66,6 @@ class VMService:
         await self._hypervisor.start_vm(vm.container_id)
         vm = await self._vm_repo.update_status(vm_id, tenant_id, VMStatus.RUNNING)
 
-        # Re-reserve CPU/RAM (disk already counted)
         await self._quota.check_and_reserve(tenant_id, vm.vcpu, vm.ram_mb, 0)
 
         if user_id:
@@ -86,7 +85,6 @@ class VMService:
         await self._hypervisor.stop_vm(vm.container_id)
         vm = await self._vm_repo.update_status(vm_id, tenant_id, VMStatus.STOPPED)
 
-        # Release CPU/RAM only — disk stays allocated
         await self._quota.release(tenant_id, vm.vcpu, vm.ram_mb, 0)
 
         if user_id:

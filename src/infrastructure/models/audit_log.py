@@ -29,8 +29,8 @@ class AuditLog(Base):
         ForeignKey("users.id", ondelete="SET NULL"),  # лог остаётся даже если юзер удалён
         nullable=False
     )
-    action: Mapped[str] = mapped_column(String(100), nullable=False)        # "vm.create"
-    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)  # "vm"
+    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
     resource_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid(as_uuid=True), nullable=True)
     details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

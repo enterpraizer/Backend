@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from itsdangerous import BadSignature, URLSafeTimedSerializer
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -121,7 +121,10 @@ class AuthService:
 
     @staticmethod
     async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> UserRequest:
-        payload = await AuthService.decode_access_token(token)
+        try:
+            payload = await AuthService.decode_access_token(token)
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Токен недействителен или истёк срок его действия")
 
         username: str = payload.get('sub')
         user_id: str = payload.get('id')

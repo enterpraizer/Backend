@@ -20,7 +20,7 @@ class HypervisorService:
         try:
             self._client = docker.from_env()
         except DockerException:
-            self._client = None  # graceful degradation if Docker not available
+            self._client = None
 
     def _container_name(self, vm_id: UUID, tenant_id: UUID) -> str:
         return f"vm-{str(tenant_id)[:8]}-{str(vm_id)[:8]}"
@@ -57,7 +57,6 @@ class HypervisorService:
                 "managed_by": "cloudiaas",
             },
         )
-        # Reload to get fresh network info after container start
         container.reload()
         networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
         ip = next(iter(networks.values()), {}).get("IPAddress", "") or "10.0.0.1"
@@ -82,7 +81,6 @@ class HypervisorService:
         return VMStatus.STOPPED
 
     async def terminate_vm(self, container_id: str, vm_id: UUID) -> None:
-        """Stop + remove container + remove disk volume."""
         if not self._client or container_id.startswith("mock-"):
             return
         try:

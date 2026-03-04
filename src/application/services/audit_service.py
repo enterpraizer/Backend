@@ -19,7 +19,6 @@ class AuditService:
         resource_id: Optional[UUID] = None,
         details: Optional[dict] = None,
     ) -> None:
-        """Write an audit log entry. Silently ignores errors to never break the main flow."""
         try:
             await self._repo.create_log(
                 tenant_id=tenant_id,
