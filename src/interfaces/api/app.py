@@ -37,7 +37,7 @@ app = FastAPI()
 # 5. SecurityHeadersMiddleware (innermost, adds headers to every response)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
