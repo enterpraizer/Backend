@@ -16,8 +16,12 @@ auth_router = APIRouter(prefix='/auth', tags=['auth'])
 
 
 @auth_router.post('/register', status_code=status.HTTP_201_CREATED)
-async def create_user(user: CreateUser, service: AuthService = Depends(get_auth_service)) -> UserResponse:
-    return await service.register_user(user)
+async def create_user(user: CreateUser, service: AuthService = Depends(get_auth_service)) -> dict:
+    await service.register_user(user)
+    return {
+        "message": "Регистрация прошла успешно. На вашу почту отправлено письмо с подтверждением.",
+        "email": user.email,
+    }
 
 
 @auth_router.get('/register_confirm', status_code=status.HTTP_200_OK)
