@@ -65,3 +65,9 @@ class VirtualMachine(Base):
         secondary="vm_network_association",
         back_populates="vms"
     )
+    metrics: Mapped[list["VmMetrics"]] = relationship(
+        "VmMetrics", back_populates="vm", cascade="all, delete-orphan"
+    )
+    suggestions: Mapped[list["VmSuggestion"]] = relationship(
+        "VmSuggestion", back_populates="vm", cascade="all, delete-orphan"
+    )
