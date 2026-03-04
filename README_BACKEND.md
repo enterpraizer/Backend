@@ -174,7 +174,7 @@ Run: alembic revision --autogenerate -m "add_tenant_vm_network_quota_usage_table
 ---
 
 ### 1.2 [Dev-1] Tenant Middleware + Tenant Context Dependency
-- [ ] ❌ **НЕ СДЕЛАНО** | **Demonstrates: Multi-tenancy, Row-Level Isolation** | ⏱ 2h
+- [x] ✅ **СДЕЛАНО** — `middleware/tenant.py` (TenantMiddleware) ✅, `dependencies/tenant.py` (get_tenant_id, get_current_tenant) ✅, подключено в `app.py` + CORSMiddleware ✅ | **Demonstrates: Multi-tenancy, Row-Level Isolation** | ⏱ 2h
 
 <details>
 <summary>📎 Copilot Prompt</summary>
