@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 from src.settings.app import AppConfig
 from src.settings.db import DatabaseConfig
 from src.settings.email import EmailSettings
+from src.settings.llm import LLMConfig
 from src.settings.redis import RedisSettings
 
 
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     app: AppConfig = AppConfig()
     db: DatabaseConfig = DatabaseConfig()
     email: EmailSettings = EmailSettings()
+    llm: LLMConfig = LLMConfig()
     redis: RedisSettings = RedisSettings()
     frontend_url: str
     secret_key: SecretStr
