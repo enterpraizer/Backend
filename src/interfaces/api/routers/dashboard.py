@@ -35,15 +35,24 @@ async def get_usage(
     quota_service: QuotaService = Depends(),
 ) -> dict:
     """Resource quota usage for the tenant. Cached in Redis for 30 seconds."""
-    redis = _get_redis()
     cache_key = f"usage:{tenant.id}"
 
-    cached = await redis.get(cache_key)
-    if cached:
-        return json.loads(cached)
+    try:
+        redis = _get_redis()
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass  # Redis unavailable — fall through to live query
 
     summary = await quota_service.get_usage_summary(tenant.id)
-    await redis.setex(cache_key, 30, json.dumps(summary))
+
+    try:
+        redis = _get_redis()
+        await redis.setex(cache_key, 30, json.dumps(summary))
+    except Exception:
+        pass  # Cache write failure is non-fatal
+
     return summary
 
 

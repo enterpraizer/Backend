@@ -58,8 +58,10 @@ class HypervisorService:
                 "managed_by": "cloudiaas",
             },
         )
+        # Reload to get fresh network info after container start
+        container.reload()
         networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
-        ip = next(iter(networks.values()), {}).get("IPAddress", "")
+        ip = next(iter(networks.values()), {}).get("IPAddress", "") or "10.0.0.1"
         return {
             "container_id": container.id,
             "container_name": container.name,

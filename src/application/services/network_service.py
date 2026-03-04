@@ -1,4 +1,5 @@
 import ipaddress
+from typing import List
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -98,7 +99,7 @@ class NetworkService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")
         await self._repo.detach_vm(network_id, vm_id)
 
-    async def get_network_vms(self, network_id: UUID, tenant_id: UUID) -> list[VMResponse]:
+    async def get_network_vms(self, network_id: UUID, tenant_id: UUID) -> List[VMResponse]:
         # Verify network belongs to tenant
         network = await self._repo.get(VirtualNetwork.id == network_id, tenant_id=tenant_id)
         if not network:

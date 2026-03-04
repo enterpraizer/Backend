@@ -107,22 +107,14 @@ async def get_tenant_quota(
 async def update_tenant_quota(
     tenant_id: UUID,
     body: QuotaUpdate,
+    current_user=Depends(require_admin),
     quota_service: QuotaService = Depends(),
 ) -> QuotaResponse:
     """Update quota limits for a tenant."""
     updates = body.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
-    from src.infrastructure.schemas.users import UserRequest, Roles
-    # Admin check already done via router dependency; build a dummy admin UserRequest
-    admin_user = UserRequest(
-        id=UUID("00000000-0000-0000-0000-000000000000"),
-        email="admin@system",
-        role=Roles.ADMIN,
-        username="system",
-        is_active=True,
-    )
-    quota = await quota_service.update_quota(tenant_id, admin_user, **updates)
+    quota = await quota_service.update_quota(tenant_id, current_user, **updates)
     return QuotaResponse.model_validate(quota, from_attributes=True)
 
 

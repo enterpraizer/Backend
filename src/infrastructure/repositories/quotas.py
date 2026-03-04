@@ -61,16 +61,21 @@ class UsageRepository(BaseRepository):
         self, tenant_id: UUID, vcpu: int, ram_mb: int, disk_gb: int
     ) -> None:
         """
-        Атомарный декремент с защитой от отрицательных значений через GREATEST(0, x - N).
+        Атомарный декремент с защитой от отрицательных значений.
+        Uses CASE WHEN for cross-database compatibility (PostgreSQL + SQLite).
         """
+
+        def _safe_sub(col, n: int):
+            return sa.case((col > n, col - n), else_=0)
+
         query = (
             sa.update(self.table)
             .where(self.table.tenant_id == tenant_id)
             .values(
-                used_vcpu=sa.func.greatest(0, self.table.used_vcpu - vcpu),
-                used_ram_mb=sa.func.greatest(0, self.table.used_ram_mb - ram_mb),
-                used_disk_gb=sa.func.greatest(0, self.table.used_disk_gb - disk_gb),
-                used_vms=sa.func.greatest(0, self.table.used_vms - 1),
+                used_vcpu=_safe_sub(self.table.used_vcpu, vcpu),
+                used_ram_mb=_safe_sub(self.table.used_ram_mb, ram_mb),
+                used_disk_gb=_safe_sub(self.table.used_disk_gb, disk_gb),
+                used_vms=_safe_sub(self.table.used_vms, 1),
             )
         )
         await self._session.execute(query)
