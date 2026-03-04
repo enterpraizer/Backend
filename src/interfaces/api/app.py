@@ -7,6 +7,7 @@ from src.interfaces.api.dependencies.session import get_db
 from src.interfaces.api.middleware.tenant import TenantMiddleware
 from src.interfaces.api.routers import users, auth
 from src.interfaces.api.routers.vms import vms_router
+from src.interfaces.api.routers.networks import networks_router
 from src.settings import settings
 
 app = FastAPI()
@@ -37,3 +38,4 @@ async def health_check(db: AsyncSession = Depends(get_db)):
 app.include_router(users.users_router)
 app.include_router(auth.auth_router)
 app.include_router(vms_router)
+app.include_router(networks_router)

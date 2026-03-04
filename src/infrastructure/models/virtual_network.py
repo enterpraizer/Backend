@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Table, UniqueConstraint, func, text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.dialects.postgresql import UUID as Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -44,6 +44,7 @@ class VirtualNetwork(Base):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     cidr: Mapped[str] = mapped_column(String(18), nullable=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[NetworkStatus] = mapped_column(
         PgEnum(NetworkStatus, name="networkstatus", create_type=True),
         default=NetworkStatus.ACTIVE,
