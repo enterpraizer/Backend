@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from itsdangerous import BadSignature, URLSafeTimedSerializer
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -181,11 +181,17 @@ class AuthService:
 
     @staticmethod
     async def decode_access_token(token: str):
-        return jwt.decode(token, settings.app.secret_key, algorithms=[settings.app.algorithm])
+        try:
+            return jwt.decode(token, settings.app.secret_key, algorithms=[settings.app.algorithm])
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Token expired or invalid")
 
     @staticmethod
     async def decode_refresh_token(token: str):
-        return jwt.decode(token, settings.app.refresh_secret_key, algorithms=[settings.app.algorithm])
+        try:
+            return jwt.decode(token, settings.app.refresh_secret_key, algorithms=[settings.app.algorithm])
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Token expired or invalid")
 
     @property
     def user_service(self):
