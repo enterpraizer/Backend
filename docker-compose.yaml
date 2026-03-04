@@ -46,10 +46,23 @@ services:
       - 8000:8000
     volumes:
       - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
 
   celery:
     build: .
     command: celery -A src.application.services.celery_config.celery_app worker --loglevel=info
+    env_file: .env
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+  celery-beat:
+    build: .
+    command: celery -A src.application.services.celery_config.celery_app beat --loglevel=info
     env_file: .env
     depends_on:
       backend:
