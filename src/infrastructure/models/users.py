@@ -6,9 +6,12 @@ from typing import Optional
 from sqlalchemy import Boolean, DateTime, String, Text, func, text
 from sqlalchemy.dialects.postgresql import ENUM as Enum
 from sqlalchemy.dialects.postgresql import UUID as Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from src.infrastructure.models.base import Base
+from src.infrastructure.models.tenant import Tenant
+from src.infrastructure.models.virtual_machine import VirtualMachine
+from src.infrastructure.models.audit_log import AuditLog
 
 
 class Roles(enum.StrEnum):
@@ -42,5 +45,14 @@ class User(Base):
         nullable=False,
         default=Roles.USER
     )
-    avatar_url: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    owned_tenants: Mapped[list["Tenant"]] = relationship(
+        "Tenant", back_populates="owner"
+    )
+    vms: Mapped[list["VirtualMachine"]] = relationship(
+        "VirtualMachine", back_populates="owner"
+    )
+    audit_logs: Mapped[list["AuditLog"]] = relationship(
+        "AuditLog", back_populates="user"
+    )
+
