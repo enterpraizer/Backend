@@ -1,3 +1,6 @@
+from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
@@ -14,3 +17,8 @@ class Tokens(BaseModel):
 class ChangePassword(BaseModel):
     old_password: str
     new_password: str
+
+
+class TenantTokenResponse(Tokens):
+    tenant_id: UUID
+    tenant_slug: str

@@ -9,6 +9,7 @@ from src.application.services.auth_service import AuthService, get_auth_service
 from src.infrastructure.models.users import User
 from src.infrastructure.schemas.auth import RefreshToken, Tokens, ChangePassword
 from src.infrastructure.schemas.users import CreateUser, UserResponse, UserRequest
+from src.infrastructure.schemas.tenant import
 
 auth_router = APIRouter(prefix='/auth', tags=['auth'])
 
@@ -38,7 +39,6 @@ async def change_password(request_user: Annotated[UserRequest, Depends(AuthServi
             detail=str(e)
         ) from None
 
-
 @auth_router.post('/token')
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
                 service: AuthService = Depends(get_auth_service)) -> Tokens:
@@ -49,7 +49,6 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
         ) from None
-
 
 @auth_router.post('/refresh')
 async def refresh_token(token: RefreshToken, service: AuthService = Depends(get_auth_service)) -> Tokens:

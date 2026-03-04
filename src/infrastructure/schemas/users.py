@@ -42,6 +42,7 @@ class UserRequest(BaseModel):
     role: Roles = Roles.USER
     username: str
     is_active: bool
+    tenant_id: Optional[UUID] = None
 
 
 class UserDeleteRequest(BaseModel):
