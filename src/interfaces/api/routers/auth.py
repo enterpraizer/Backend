@@ -6,8 +6,10 @@ from jose import JWTError
 
 from src.application.services import exceptions
 from src.application.services.auth_service import AuthService, get_auth_service
+from src.application.services.tenant_service import TenantService
 from src.infrastructure.models.users import User
-from src.infrastructure.schemas.auth import RefreshToken, Tokens, ChangePassword
+from src.infrastructure.schemas.auth import RefreshToken, Tokens, ChangePassword, TenantTokenResponse
+from src.infrastructure.schemas.tenant import TenantCreate
 from src.infrastructure.schemas.users import CreateUser, UserResponse, UserRequest
 
 auth_router = APIRouter(prefix='/auth', tags=['auth'])
@@ -74,3 +76,17 @@ async def read_current_user(
         return request_user
     except exceptions.UserValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
+
+
+@auth_router.post('/tenant', status_code=status.HTTP_201_CREATED)
+async def create_tenant(
+        body: TenantCreate,
+        current_user: Annotated[UserRequest, Depends(AuthService.get_current_user)],
+        auth_service: AuthService = Depends(get_auth_service),
+        tenant_service: TenantService = Depends(),
+) -> TenantTokenResponse:
+    """Create a new tenant for the authenticated user and return fresh JWT tokens with tenant_id."""
+    tenant = await tenant_service.create_tenant(name=body.name, owner_id=current_user.id)
+    user = await auth_service.user_service.get(User.id == current_user.id)
+    user_response = UserResponse.model_validate(user, from_attributes=True)
+    return await auth_service.issue_tokens_with_tenant(user_response, tenant)
