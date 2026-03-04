@@ -76,7 +76,7 @@ class UserService:
             raise exceptions.UserAlreadyExistsError(
                 'Пользователь с такими данными уже существует'
             )
-        return UserResponse.modl_validate(user, from_attributes=True)
+        return UserResponse.model_validate(user, from_attributes=True)
 
     @property
     def repository(self):

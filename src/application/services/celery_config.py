@@ -9,4 +9,3 @@ celery_app = Celery(
     broker_connection_retry_on_startup=True,
     include=["src.application.services.tasks"]
 )
-
