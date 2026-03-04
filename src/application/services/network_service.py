@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 
+from src.application.services.audit_service import AuditService
 from src.infrastructure.models.virtual_network import VirtualNetwork
 from src.infrastructure.repositories.network import NetworkRepository
 from src.infrastructure.repositories.virtual_machine import VMRepository
@@ -15,11 +16,13 @@ class NetworkService:
         self,
         repo: NetworkRepository = Depends(),
         vm_repo: VMRepository = Depends(),
+        audit: AuditService = Depends(),
     ) -> None:
         self._repo = repo
         self._vm_repo = vm_repo
+        self._audit = audit
 
-    async def create(self, tenant_id: UUID, data: NetworkCreate) -> NetworkResponse:
+    async def create(self, tenant_id: UUID, data: NetworkCreate, user_id: UUID | None = None) -> NetworkResponse:
         # Check CIDR overlap with existing tenant networks
         existing_cidrs = await self._repo.get_network_cidrs(tenant_id)
         new_net = ipaddress.ip_network(data.cidr, strict=False)
@@ -37,6 +40,12 @@ class NetworkService:
             cidr=data.cidr,
             is_public=data.is_public,
         )
+        if user_id:
+            await self._audit.log(
+                tenant_id=tenant_id, user_id=user_id,
+                action="network.create", resource_type="network", resource_id=network.id,
+                details={"name": data.name, "cidr": data.cidr},
+            )
         return NetworkResponse.model_validate(network, from_attributes=True)
 
     async def get(self, network_id: UUID, tenant_id: UUID) -> NetworkResponse:
@@ -53,11 +62,16 @@ class NetworkService:
             total=total,
         )
 
-    async def delete(self, network_id: UUID, tenant_id: UUID) -> None:
+    async def delete(self, network_id: UUID, tenant_id: UUID, user_id: UUID | None = None) -> None:
         network = await self._repo.get(VirtualNetwork.id == network_id, tenant_id=tenant_id)
         if not network:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")
         await self._repo.delete(VirtualNetwork.id == network_id, tenant_id=tenant_id)
+        if user_id:
+            await self._audit.log(
+                tenant_id=tenant_id, user_id=user_id,
+                action="network.delete", resource_type="network", resource_id=network_id,
+            )
 
     async def attach_vm(self, network_id: UUID, vm_id: UUID, tenant_id: UUID) -> None:
         # Both must belong to the same tenant

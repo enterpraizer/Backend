@@ -38,7 +38,7 @@ async def create_network(
     service: NetworkService = Depends(),
 ) -> NetworkResponse:
     """Create a new VPC. Returns 409 if CIDR overlaps with an existing network."""
-    return await service.create(tenant_id=tenant.id, data=body)
+    return await service.create(tenant_id=tenant.id, data=body, user_id=current_user.id)
 
 
 @networks_router.get("/{network_id}", response_model=NetworkResponse, status_code=status.HTTP_200_OK)
@@ -60,7 +60,7 @@ async def delete_network(
     service: NetworkService = Depends(),
 ) -> None:
     """Delete a network."""
-    await service.delete(network_id=network_id, tenant_id=tenant.id)
+    await service.delete(network_id=network_id, tenant_id=tenant.id, user_id=current_user.id)
 
 
 @networks_router.post("/{network_id}/attach-vm", status_code=status.HTTP_204_NO_CONTENT)

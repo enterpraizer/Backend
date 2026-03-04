@@ -75,7 +75,7 @@ async def start_vm(
     service: VMService = Depends(),
 ) -> VMResponse:
     """Start a stopped VM. Returns 409 if VM is not in STOPPED state."""
-    return await service.start(vm_id=vm_id, tenant_id=tenant.id)
+    return await service.start(vm_id=vm_id, tenant_id=tenant.id, user_id=current_user.id)
 
 
 @vms_router.post("/{vm_id}/stop", response_model=VMResponse, status_code=status.HTTP_200_OK)
@@ -86,7 +86,7 @@ async def stop_vm(
     service: VMService = Depends(),
 ) -> VMResponse:
     """Stop a running VM. Returns 409 if VM is not in RUNNING state."""
-    return await service.stop(vm_id=vm_id, tenant_id=tenant.id)
+    return await service.stop(vm_id=vm_id, tenant_id=tenant.id, user_id=current_user.id)
 
 
 @vms_router.delete("/{vm_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -97,7 +97,7 @@ async def terminate_vm(
     service: VMService = Depends(),
 ) -> None:
     """Terminate a VM: stops and removes the Docker container, releases all quota."""
-    await service.terminate(vm_id=vm_id, tenant_id=tenant.id)
+    await service.terminate(vm_id=vm_id, tenant_id=tenant.id, user_id=current_user.id)
 
 
 @vms_router.patch("/{vm_id}", response_model=VMResponse, status_code=status.HTTP_200_OK)
