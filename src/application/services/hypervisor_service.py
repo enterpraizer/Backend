@@ -34,7 +34,6 @@ class HypervisorService:
         ram_mb: int,
         disk_gb: int,
     ) -> dict:
-        """Spawn a Docker container simulating a VM."""
         container_name = self._container_name(vm_id, tenant_id)
         if not self._client:
             return {
@@ -108,7 +107,6 @@ class HypervisorService:
             return VMStatus.TERMINATED
 
     async def list_tenant_containers(self, tenant_id: UUID) -> list[dict]:
-        """List all containers belonging to this tenant via label filter."""
         if not self._client:
             return []
         containers = self._client.containers.list(

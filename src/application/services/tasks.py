@@ -14,7 +14,7 @@ from src.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Synchronous DB engine for Celery workers (no async)
+# Synchronous engine for Celery workers — asyncpg not supported
 _sync_url = settings.db.url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 _sync_engine = create_engine(_sync_url, pool_pre_ping=True)
 

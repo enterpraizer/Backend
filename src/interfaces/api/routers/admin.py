@@ -22,8 +22,6 @@ admin_router = APIRouter(
 )
 
 
-# ─── Tenant management ────────────────────────────────────────────────────────
-
 @admin_router.get("/tenants", response_model=TenantListResponse, status_code=status.HTTP_200_OK)
 async def list_tenants(
     limit: int = 20,
@@ -54,7 +52,6 @@ async def get_tenant(
     tenant_id: UUID,
     service: TenantService = Depends(),
 ) -> TenantResponse:
-    """Get tenant details."""
     tenant = await service.get_tenant(tenant_id)
     return TenantResponse.model_validate(tenant, from_attributes=True)
 
@@ -83,8 +80,6 @@ async def deactivate_tenant(
     await service.deactivate_tenant(tenant_id)
 
 
-# ─── Quota management ─────────────────────────────────────────────────────────
-
 @admin_router.get(
     "/tenants/{tenant_id}/quota",
     response_model=dict,
@@ -94,7 +89,6 @@ async def get_tenant_quota(
     tenant_id: UUID,
     quota_service: QuotaService = Depends(),
 ) -> dict:
-    """Get quota limits and current usage for a tenant."""
     summary = await quota_service.get_usage_summary(tenant_id)
     return summary
 
@@ -110,7 +104,6 @@ async def update_tenant_quota(
     current_user=Depends(require_admin),
     quota_service: QuotaService = Depends(),
 ) -> QuotaResponse:
-    """Update quota limits for a tenant."""
     updates = body.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
@@ -118,18 +111,14 @@ async def update_tenant_quota(
     return QuotaResponse.model_validate(quota, from_attributes=True)
 
 
-# ─── Global statistics ────────────────────────────────────────────────────────
-
 @admin_router.get("/stats", status_code=status.HTTP_200_OK)
 async def get_stats(
     tenant_repo: TenantRepository = Depends(),
     vm_repo: VMRepository = Depends(),
 ) -> dict:
-    """Global platform statistics."""
     total_tenants = await tenant_repo.count()
     active_tenants = await tenant_repo.count(Tenant.is_active == True)  # noqa: E712
 
-    # VM counts
     all_vms = await vm_repo.get_all_across_tenants(limit=100_000, offset=0)
     total_vms = len(all_vms)
     running_vms = sum(1 for v in all_vms if v.status == VMStatus.RUNNING)
@@ -137,7 +126,6 @@ async def get_stats(
     total_ram = sum(v.ram_mb for v in all_vms if v.status == VMStatus.RUNNING)
     total_disk = sum(v.disk_gb for v in all_vms)
 
-    # Top 5 tenants by VM count
     from collections import Counter
     tenant_vm_counts = Counter(str(v.tenant_id) for v in all_vms)
     top_tenant_ids = [tid for tid, _ in tenant_vm_counts.most_common(5)]
@@ -158,8 +146,6 @@ async def get_stats(
         "top_tenants_by_vms": top_tenants,
     }
 
-
-# ─── All VMs across tenants ───────────────────────────────────────────────────
 
 @admin_router.get("/vms", status_code=status.HTTP_200_OK)
 async def list_all_vms(

@@ -62,7 +62,6 @@ async def get_vm_summary(
     tenant: Tenant = Depends(get_current_tenant),
     vm_repo: VMRepository = Depends(),
 ) -> dict:
-    """VM count grouped by status for the current tenant."""
     counts = await vm_repo.count_by_status(tenant.id)
     total = sum(counts.values())
     return {
@@ -80,7 +79,6 @@ async def get_network_summary(
     tenant: Tenant = Depends(get_current_tenant),
     network_repo: NetworkRepository = Depends(),
 ) -> dict:
-    """Network count for the current tenant."""
     from src.infrastructure.models.virtual_network import VirtualNetwork, NetworkStatus
     total = await network_repo.count(tenant_id=tenant.id)
     active = await network_repo.count(
@@ -96,7 +94,6 @@ async def get_activity(
     tenant: Tenant = Depends(get_current_tenant),
     audit_repo: AuditLogRepository = Depends(),
 ) -> list[dict]:
-    """Last 20 audit log entries for the current tenant."""
     logs = await audit_repo.get_recent(tenant_id=tenant.id, limit=20)
     return [
         {

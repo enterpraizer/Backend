@@ -29,12 +29,6 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Middleware order (added last = runs first):
-# 1. CORSMiddleware  (outermost)
-# 2. TenantMiddleware
-# 3. RedisRateLimitMiddleware
-# 4. RequestLoggingMiddleware
-# 5. SecurityHeadersMiddleware (innermost, adds headers to every response)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -48,9 +42,6 @@ app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 
-# ---------------------------------------------------------------------------
-# Global exception handlers
-# ---------------------------------------------------------------------------
 
 @app.exception_handler(QuotaExceededError)
 async def quota_exceeded_handler(request: Request, exc: QuotaExceededError):
@@ -94,9 +85,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check(db: AsyncSession = Depends(get_db)):

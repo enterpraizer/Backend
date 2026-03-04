@@ -24,7 +24,6 @@ class NetworkService:
         self._audit = audit
 
     async def create(self, tenant_id: UUID, data: NetworkCreate, user_id: UUID | None = None) -> NetworkResponse:
-        # Check CIDR overlap with existing tenant networks
         existing_cidrs = await self._repo.get_network_cidrs(tenant_id)
         new_net = ipaddress.ip_network(data.cidr, strict=False)
         for cidr in existing_cidrs:
@@ -100,7 +99,6 @@ class NetworkService:
         await self._repo.detach_vm(network_id, vm_id)
 
     async def get_network_vms(self, network_id: UUID, tenant_id: UUID) -> List[VMResponse]:
-        # Verify network belongs to tenant
         network = await self._repo.get(VirtualNetwork.id == network_id, tenant_id=tenant_id)
         if not network:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")

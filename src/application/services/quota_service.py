@@ -51,7 +51,6 @@ class QuotaService:
         await self._usage.increment(tenant_id, vcpu, ram_mb, disk_gb)
 
     async def release(self, tenant_id: UUID, vcpu: int, ram_mb: int, disk_gb: int) -> None:
-        """Decrement usage after VM stop or terminate."""
         await self._usage.decrement(tenant_id, vcpu, ram_mb, disk_gb)
 
     async def get_usage_summary(self, tenant_id: UUID) -> dict:
@@ -90,7 +89,6 @@ class QuotaService:
     async def update_quota(
         self, tenant_id: UUID, admin_user: UserRequest, **quota_fields
     ) -> ResourceQuota:
-        """Admin-only: update quota limits."""
         if admin_user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

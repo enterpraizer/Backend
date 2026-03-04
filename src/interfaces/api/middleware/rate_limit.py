@@ -10,7 +10,6 @@ from src.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Limits
 GENERAL_LIMIT = 100   # req/min
 AUTH_LIMIT = 10       # req/min for /auth/* (brute-force protection)
 WINDOW_SECONDS = 60

@@ -27,9 +27,6 @@ DEMO_TENANT_SLUG = "demo-tenant"
 
 
 async def seed(session: AsyncSession) -> None:
-    # ------------------------------------------------------------------ #
-    # 1. Admin user
-    # ------------------------------------------------------------------ #
     existing = (await session.execute(select(User).where(User.email == ADMIN_EMAIL))).scalar_one_or_none()
     if existing:
         print(f"[seed] Admin user already exists (id={existing.id}), skipping.")
@@ -50,9 +47,6 @@ async def seed(session: AsyncSession) -> None:
         await session.flush()
         print(f"[seed] Created admin user  id={admin.id}  email={admin.email}")
 
-    # ------------------------------------------------------------------ #
-    # 2. Demo tenant
-    # ------------------------------------------------------------------ #
     existing_t = (await session.execute(select(Tenant).where(Tenant.slug == DEMO_TENANT_SLUG))).scalar_one_or_none()
     if existing_t:
         print(f"[seed] Demo tenant already exists (id={existing_t.id}), skipping.")
@@ -69,9 +63,6 @@ async def seed(session: AsyncSession) -> None:
         await session.flush()
         print(f"[seed] Created tenant       id={tenant.id}  slug={tenant.slug}")
 
-    # ------------------------------------------------------------------ #
-    # 3. ResourceQuota for demo tenant
-    # ------------------------------------------------------------------ #
     existing_q = (await session.execute(select(ResourceQuota).where(ResourceQuota.tenant_id == tenant.id))).scalar_one_or_none()
     if not existing_q:
         quota = ResourceQuota(
@@ -85,9 +76,6 @@ async def seed(session: AsyncSession) -> None:
         session.add(quota)
         print(f"[seed] Created quota        tenant_id={tenant.id}")
 
-    # ------------------------------------------------------------------ #
-    # 4. ResourceUsage (zeroed) for demo tenant
-    # ------------------------------------------------------------------ #
     existing_u = (await session.execute(select(ResourceUsage).where(ResourceUsage.tenant_id == tenant.id))).scalar_one_or_none()
     if not existing_u:
         usage = ResourceUsage(
@@ -101,9 +89,6 @@ async def seed(session: AsyncSession) -> None:
         session.add(usage)
         print(f"[seed] Created usage record tenant_id={tenant.id}")
 
-    # ------------------------------------------------------------------ #
-    # 5. Two demo VMs in STOPPED state
-    # ------------------------------------------------------------------ #
     vms_data = [
         dict(name="web-server-01", vcpu=2, ram_mb=2048, disk_gb=20),
         dict(name="db-server-01",  vcpu=4, ram_mb=8192, disk_gb=100),
