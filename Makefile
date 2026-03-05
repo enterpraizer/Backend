@@ -4,7 +4,7 @@ dev:
 	docker compose up --build
 
 down:
-	docker compose down -v
+	docker compose down
 
 migrate:
 	docker compose exec backend alembic upgrade head

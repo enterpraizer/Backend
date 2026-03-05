@@ -31,7 +31,6 @@ class TenantService:
     async def create_tenant(self, name: str, owner_id: UUID) -> Tenant:
         slug = _slugify(name)
 
-        # Ensure unique slug
         existing = await self._repo.get_by_slug(slug)
         if existing:
             raise HTTPException(
@@ -41,7 +40,6 @@ class TenantService:
 
         tenant = await self._repo.create(name=name, slug=slug, owner_id=owner_id)
 
-        # Create default quota
         await self._quota_repo.create(
             tenant_id=tenant.id,
             max_vcpu=8,
@@ -50,7 +48,6 @@ class TenantService:
             max_vms=5,
         )
 
-        # Create zeroed usage record
         await self._usage_repo.create(
             tenant_id=tenant.id,
             used_vcpu=0,

@@ -1,8 +1,8 @@
-"""IaaS components
+"""Iaas components
 
-Revision ID: 60672e32d54a
+Revision ID: 699113298584
 Revises: 
-Create Date: 2026-03-04 16:06:04.998267
+Create Date: 2026-03-04 17:52:30.018563
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '60672e32d54a'
+revision: str = '699113298584'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -115,6 +115,7 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('cidr', sa.String(length=18), nullable=False),
+    sa.Column('is_public', sa.Boolean(), nullable=False),
     sa.Column('status', postgresql.ENUM('ACTIVE', 'INACTIVE', name='networkstatus'), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='RESTRICT'),

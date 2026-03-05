@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 
+from src.application.services.audit_service import AuditService
 from src.application.services.hypervisor_service import HypervisorService
 from src.application.services.quota_service import QuotaService
 from src.infrastructure.models.virtual_machine import VMStatus, VirtualMachine
@@ -15,10 +16,12 @@ class VMService:
         vm_repo: VMRepository = Depends(),
         quota_service: QuotaService = Depends(),
         hypervisor: HypervisorService = Depends(),
+        audit: AuditService = Depends(),
     ) -> None:
         self._vm_repo = vm_repo
         self._quota = quota_service
         self._hypervisor = hypervisor
+        self._audit = audit
 
     async def create(self, tenant_id: UUID, owner_id: UUID, data: VMCreate) -> VMResponse:
         await self._quota.check_and_reserve(tenant_id, data.vcpu, data.ram_mb, data.disk_gb)
@@ -33,9 +36,18 @@ class VMService:
             status=VMStatus.PENDING,
         )
 
-        result = await self._hypervisor.provision_vm(
-            vm.id, tenant_id, data.name, data.vcpu, data.ram_mb, data.disk_gb
-        )
+        try:
+            result = await self._hypervisor.provision_vm(
+                vm.id, tenant_id, data.name, data.vcpu, data.ram_mb, data.disk_gb
+            )
+        except Exception:
+            # Rollback: remove the VM record and release quota so the tenant is not charged
+            await self._vm_repo.delete(VirtualMachine.id == vm.id, tenant_id=tenant_id)
+            await self._quota.release(tenant_id, data.vcpu, data.ram_mb, data.disk_gb)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to provision VM — hypervisor error",
+            )
 
         vm = await self._vm_repo.update_status(
             vm.id,
@@ -46,9 +58,14 @@ class VMService:
             container_name=result["container_name"],
         )
 
+        await self._audit.log(
+            tenant_id=tenant_id, user_id=owner_id,
+            action="vm.create", resource_type="vm", resource_id=vm.id,
+            details={"name": data.name, "vcpu": data.vcpu, "ram_mb": data.ram_mb, "disk_gb": data.disk_gb},
+        )
         return VMResponse.model_validate(vm, from_attributes=True)
 
-    async def start(self, vm_id: UUID, tenant_id: UUID) -> VMResponse:
+    async def start(self, vm_id: UUID, tenant_id: UUID, user_id: UUID | None = None) -> VMResponse:
         vm = await self._vm_repo.get(VirtualMachine.id == vm_id, tenant_id=tenant_id)
         if not vm:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
@@ -61,9 +78,14 @@ class VMService:
         # Re-reserve CPU/RAM (disk already counted)
         await self._quota.check_and_reserve(tenant_id, vm.vcpu, vm.ram_mb, 0)
 
+        if user_id:
+            await self._audit.log(
+                tenant_id=tenant_id, user_id=user_id,
+                action="vm.start", resource_type="vm", resource_id=vm_id,
+            )
         return VMResponse.model_validate(vm, from_attributes=True)
 
-    async def stop(self, vm_id: UUID, tenant_id: UUID) -> VMResponse:
+    async def stop(self, vm_id: UUID, tenant_id: UUID, user_id: UUID | None = None) -> VMResponse:
         vm = await self._vm_repo.get(VirtualMachine.id == vm_id, tenant_id=tenant_id)
         if not vm:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
@@ -76,9 +98,14 @@ class VMService:
         # Release CPU/RAM only — disk stays allocated
         await self._quota.release(tenant_id, vm.vcpu, vm.ram_mb, 0)
 
+        if user_id:
+            await self._audit.log(
+                tenant_id=tenant_id, user_id=user_id,
+                action="vm.stop", resource_type="vm", resource_id=vm_id,
+            )
         return VMResponse.model_validate(vm, from_attributes=True)
 
-    async def terminate(self, vm_id: UUID, tenant_id: UUID) -> None:
+    async def terminate(self, vm_id: UUID, tenant_id: UUID, user_id: UUID | None = None) -> None:
         vm = await self._vm_repo.get(VirtualMachine.id == vm_id, tenant_id=tenant_id)
         if not vm:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
@@ -88,6 +115,12 @@ class VMService:
 
         # Full release: CPU + RAM + disk
         await self._quota.release(tenant_id, vm.vcpu, vm.ram_mb, vm.disk_gb)
+
+        if user_id:
+            await self._audit.log(
+                tenant_id=tenant_id, user_id=user_id,
+                action="vm.terminate", resource_type="vm", resource_id=vm_id,
+            )
 
     async def get(self, vm_id: UUID, tenant_id: UUID) -> VMResponse:
         vm = await self._vm_repo.get(VirtualMachine.id == vm_id, tenant_id=tenant_id)
@@ -103,10 +136,8 @@ class VMService:
         status_filter: VMStatus | None = None,
     ) -> tuple[list[VMResponse], int]:
         extra = (VirtualMachine.status == status_filter,) if status_filter else ()
-        items = await self._vm_repo.get_all(
-            tenant_id=tenant_id, limit=limit, offset=offset, *extra
-        )
-        total = await self._vm_repo.count(tenant_id=tenant_id, *extra)
+        items = await self._vm_repo.get_all(tenant_id, limit, offset, None, *extra)
+        total = await self._vm_repo.count(tenant_id, *extra)
         return [VMResponse.model_validate(v, from_attributes=True) for v in items], total
 
     async def update(self, vm_id: UUID, tenant_id: UUID, **kwargs) -> VMResponse:
@@ -115,4 +146,38 @@ class VMService:
         )
         if not vm:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
+        return VMResponse.model_validate(vm, from_attributes=True)
+
+    async def resize(
+        self,
+        vm_id: UUID,
+        tenant_id: UUID,
+        vcpu: int,
+        ram_mb: int,
+        disk_gb: int,
+        user_id: UUID,
+    ) -> VMResponse:
+        vm = await self._vm_repo.get(VirtualMachine.id == vm_id, tenant_id=tenant_id)
+        if not vm:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
+        if vm.status == VMStatus.RUNNING:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Stop VM before resizing",
+            )
+        vm = await self._vm_repo.update(
+            VirtualMachine.id == vm_id,
+            tenant_id=tenant_id,
+            vcpu=vcpu,
+            ram_mb=ram_mb,
+            disk_gb=disk_gb,
+        )
+        await self._audit.log(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            action="vm.resize",
+            resource_type="vm",
+            resource_id=vm_id,
+            details={"vcpu": vcpu, "ram_mb": ram_mb, "disk_gb": disk_gb},
+        )
         return VMResponse.model_validate(vm, from_attributes=True)

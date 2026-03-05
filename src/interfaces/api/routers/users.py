@@ -58,11 +58,11 @@ async def user_detail(user_id: UUID, request_user: Annotated[UserRequest, Depend
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
 
 
-@users_router.patch("/{user_id}", status_code=status.HTTP_200_OK)
+@users_router.patch("/{user_id}", response_model=UserResponse, response_model_exclude={"hashed_password"}, status_code=status.HTTP_200_OK)
 async def update_user(user_id: UUID, request_user: Annotated[UserRequest, Depends(AuthService.get_current_user)],
-                      user_update: UserUpdate, service: UserService = Depends()) -> None:
+                      user_update: UserUpdate, service: UserService = Depends()) -> UserResponse:
     try:
-        await service.update(user_id, request_user, user_update)
+        return await service.update(user_id, request_user, user_update)
     except exceptions.UserPermissionDenied as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

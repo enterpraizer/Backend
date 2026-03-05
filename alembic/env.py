@@ -32,6 +32,15 @@ config.set_main_option(
 # target_metadata = mymodel.Base.metadata
 from src.infrastructure.models.base import Base
 from src.infrastructure.models.users import User
+from src.infrastructure.models.tenant import Tenant
+from src.infrastructure.models.resource_quota import ResourceQuota
+from src.infrastructure.models.resource_usage import ResourceUsage
+from src.infrastructure.models.virtual_machine import VirtualMachine
+from src.infrastructure.models.virtual_network import VirtualNetwork
+from src.infrastructure.models.audit_log import AuditLog
+from src.infrastructure.models.vm_metrics import VmMetrics
+from src.infrastructure.models.vm_suggestion import VmSuggestion
+from src.infrastructure.models.vm_description_log import VmDescriptionLog
 
 target_metadata = Base.metadata
 

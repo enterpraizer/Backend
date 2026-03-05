@@ -16,8 +16,12 @@ auth_router = APIRouter(prefix='/auth', tags=['auth'])
 
 
 @auth_router.post('/register', status_code=status.HTTP_201_CREATED)
-async def create_user(user: CreateUser, service: AuthService = Depends(get_auth_service)) -> UserResponse:
-    return await service.register_user(user)
+async def create_user(user: CreateUser, service: AuthService = Depends(get_auth_service)) -> dict:
+    await service.register_user(user)
+    return {
+        "message": "Регистрация прошла успешно. На вашу почту отправлено письмо с подтверждением.",
+        "email": user.email,
+    }
 
 
 @auth_router.get('/register_confirm', status_code=status.HTTP_200_OK)
@@ -66,14 +70,16 @@ async def refresh_token(token: RefreshToken, service: AuthService = Depends(get_
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалидный refresh токен")
 
 
-@auth_router.get('/me')
+@auth_router.get('/me', response_model=UserResponse, response_model_exclude={"hashed_password"})
 async def read_current_user(
         request_user: Annotated[UserRequest, Depends(AuthService.get_current_user)],
         service: AuthService = Depends(get_auth_service)
 ) -> UserResponse:
     try:
-        request_user = await service.user_service.get(User.email == request_user.email)
-        return request_user
+        user = await service.user_service.get(User.email == request_user.email)
+        # tenant_id lives in the JWT claims (not on the User DB row) — inject it here
+        user.tenant_id = request_user.tenant_id
+        return user
     except exceptions.UserValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
 

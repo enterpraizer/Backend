@@ -40,10 +40,7 @@ class UsageRepository(BaseRepository):
     async def increment(
         self, tenant_id: UUID, vcpu: int, ram_mb: int, disk_gb: int
     ) -> None:
-        """
-        Атомарный инкремент через UPDATE ... SET x = x + N.
-        Исключает race condition при параллельных запросах.
-        """
+        """Atomic UPDATE ... SET x = x + N to avoid race conditions under parallel requests."""
         query = (
             sa.update(self.table)
             .where(self.table.tenant_id == tenant_id)
@@ -60,24 +57,25 @@ class UsageRepository(BaseRepository):
     async def decrement(
         self, tenant_id: UUID, vcpu: int, ram_mb: int, disk_gb: int
     ) -> None:
-        """
-        Атомарный декремент с защитой от отрицательных значений через GREATEST(0, x - N).
-        """
+        """Atomic decrement with floor at 0. CASE WHEN instead of GREATEST() for SQLite compatibility."""
+
+        def _safe_sub(col, n: int):
+            return sa.case((col > n, col - n), else_=0)
+
         query = (
             sa.update(self.table)
             .where(self.table.tenant_id == tenant_id)
             .values(
-                used_vcpu=sa.func.greatest(0, self.table.used_vcpu - vcpu),
-                used_ram_mb=sa.func.greatest(0, self.table.used_ram_mb - ram_mb),
-                used_disk_gb=sa.func.greatest(0, self.table.used_disk_gb - disk_gb),
-                used_vms=sa.func.greatest(0, self.table.used_vms - 1),
+                used_vcpu=_safe_sub(self.table.used_vcpu, vcpu),
+                used_ram_mb=_safe_sub(self.table.used_ram_mb, ram_mb),
+                used_disk_gb=_safe_sub(self.table.used_disk_gb, disk_gb),
+                used_vms=_safe_sub(self.table.used_vms, 1),
             )
         )
         await self._session.execute(query)
         await self._session.flush()
 
     async def reset(self, tenant_id: UUID) -> None:
-        """Обнуляет счётчики — для admin или тестов."""
         query = (
             sa.update(self.table)
             .where(self.table.tenant_id == tenant_id)
@@ -87,7 +85,6 @@ class UsageRepository(BaseRepository):
         await self._session.flush()
 
     async def get_total_allocated(self) -> dict:
-        """Для admin/stats — суммирует потребление по всем тенантам."""
         query = sa.select(
             sa.func.sum(self.table.used_vcpu).label("total_vcpu"),
             sa.func.sum(self.table.used_ram_mb).label("total_ram_mb"),

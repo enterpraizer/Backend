@@ -35,3 +35,35 @@ class VMResponse(BaseModel):
 class VMListResponse(BaseModel):
     items: list[VMResponse]
     total: int
+
+
+class VMSuggestRequest(BaseModel):
+    description: str = Field(..., min_length=10, max_length=1000)
+
+
+class VMSuggestResponse(BaseModel):
+    vcpu: int
+    ram_mb: int
+    disk_gb: int
+    reasoning: str
+    confidence: float
+
+
+class SuggestionResponse(BaseModel):
+    id: UUID
+    vm_id: UUID
+    tenant_id: UUID
+    suggestion_text: str
+    suggested_config: Optional[dict]
+    confidence: float
+    status: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TriggerAnalyzeResponse(BaseModel):
+    suggestion: Optional[SuggestionResponse]
+    cooldown_remaining_sec: int  # 0 means not on cooldown
+    next_available_at: Optional[str]  # ISO timestamp or None
+    message: str
