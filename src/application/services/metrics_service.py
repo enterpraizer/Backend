@@ -1,9 +1,7 @@
 import math
 import random
 from datetime import datetime, timezone
-
 from fastapi import Depends
-
 from src.infrastructure.models.virtual_machine import VirtualMachine, VMStatus
 from src.infrastructure.models.vm_metrics import VmMetrics
 from src.infrastructure.repositories.vm_metrics import VmMetricsRepository
@@ -14,11 +12,6 @@ class MetricsService:
         self._repo = metrics_repo
 
     async def collect_for_vm(self, vm: VirtualMachine) -> VmMetrics:
-        """
-        Simulate realistic metrics based on VM age and status.
-        Applies a daily sine wave cycle on top of random base load.
-        Stopped VMs emit zeroed metrics.
-        """
         if vm.status != VMStatus.RUNNING:
             return await self._repo.create(
                 vm_id=vm.id, cpu_pct=0.0, ram_pct=0.0, disk_pct=0.0
@@ -31,7 +24,6 @@ class MetricsService:
         cpu_pct = max(1.0, min(99.0, base_cpu + daily_cycle + random.uniform(-5, 5)))
 
         ram_pct = min(99.0, random.uniform(20, 85) + random.uniform(-5, 5))
-        # Disk fills gradually over time — 0.1% per hour + small noise
         disk_pct = min(99.0, 30 + (age_hours * 0.1) + random.uniform(-2, 2))
 
         return await self._repo.create(

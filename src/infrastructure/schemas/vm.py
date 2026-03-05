@@ -60,3 +60,10 @@ class SuggestionResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TriggerAnalyzeResponse(BaseModel):
+    suggestion: Optional[SuggestionResponse]
+    cooldown_remaining_sec: int  # 0 means not on cooldown
+    next_available_at: Optional[str]  # ISO timestamp or None
+    message: str

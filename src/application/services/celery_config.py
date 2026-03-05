@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 from src.settings import settings
 
@@ -25,6 +26,11 @@ celery_app.conf.beat_schedule = {
     },
     "analyze-vm-optimizations": {
         "task": "analyze_vm_optimizations",
-        "schedule": 3600.0,
+        "schedule": 300.0,
+    },
+    # Every Monday at 09:00 MSK (= 06:00 UTC)
+    "send-weekly-ai-report": {
+        "task": "send_weekly_ai_report",
+        "schedule": crontab(hour=6, minute=0, day_of_week=1),
     },
 }

@@ -81,6 +81,12 @@ class VMRepository(TenantScopedRepository):
         result = await self._session.execute(query)
         return result.scalars().all()
 
+    async def count_across_tenants(self) -> int:
+        """Total VM count across all tenants (admin only)."""
+        query = sa.select(sa.func.count()).select_from(self.table)
+        result = await self._session.execute(query)
+        return result.scalar_one()
+
     async def get_all_running(self) -> Sequence[VirtualMachine]:
         """Для Celery-задачи синхронизации статусов."""
         query = sa.select(self.table).where(

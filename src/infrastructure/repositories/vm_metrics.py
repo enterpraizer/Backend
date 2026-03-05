@@ -11,8 +11,8 @@ class VmMetricsRepository(BaseRepository):
 
     async def get_recent(self, vm_id: UUID, hours: int = 168) -> list[VmMetrics]:
         """Return metrics for a VM from the last N hours (default 7 days)."""
-        from datetime import datetime, timedelta, timezone
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        from datetime import datetime, timedelta
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
         query = (
             sa.select(self.table)
             .where(self.table.vm_id == vm_id, self.table.recorded_at >= cutoff)

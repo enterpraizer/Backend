@@ -34,6 +34,7 @@ class UserResponse(UserBase):
     is_verified: Optional[bool] = False
     hashed_password: Optional[str] = None
     role: Roles = Roles.USER
+    tenant_id: Optional[UUID] = None
 
 
 class UserRequest(BaseModel):

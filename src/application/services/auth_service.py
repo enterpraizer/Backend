@@ -1,15 +1,12 @@
 from datetime import datetime, timedelta
 from typing import Annotated, Optional
 from uuid import UUID
-
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from sqlalchemy import or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy import or_
 from src.application.services import exceptions
 from src.application.services.tasks import send_confirmation_email
 from src.application.services.users_service import UserService
@@ -33,10 +30,10 @@ class AuthService:
 
     async def register_user(self, user: CreateUser) -> UserResponse:
         try:
-            user_exist = await self._user_service.get(
+            await self._user_service.get(
                 or_(User.username == user.username, User.email == user.email)
             )
-            user_data = user_exist
+            raise exceptions.UserAlreadyExistsError('Пользователь уже существует')
         except exceptions.UserNotFound:
             user_data = await self._user_service.create(user)
         confirmation_token = self.serializer.dumps(user_data.email)
@@ -83,6 +80,8 @@ class AuthService:
         username = payload.get('sub')
 
         user = await self._user_service.get(User.username == username)
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Account is disabled")
         user_response = UserResponse.model_validate(user, from_attributes=True)
 
         tenant_id = await self._get_tenant_id_for_user(user.id)
@@ -165,7 +164,7 @@ class AuthService:
     @staticmethod
     async def create_jwt_token(data: dict, expires_delta: timedelta, secret_key: str):
         to_encode = data.copy()
-        expires = datetime.now() + expires_delta
+        expires = datetime.utcnow() + expires_delta
         to_encode.update({'exp': expires})
         return jwt.encode(to_encode, secret_key, algorithm=settings.app.algorithm)
 

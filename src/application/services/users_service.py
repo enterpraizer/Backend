@@ -46,24 +46,28 @@ class UserService:
     async def delete(self, user_id: UUID, request_user: UserRequest) -> None:
         user = await self.get(User.id == user_id)
         request_user = await self.get(User.email == request_user.email)
-        if (request_user == user and request_user.is_active) or request_user.role == 'admin':
+        # Prevent any user (including admin) from deleting their own account
+        if str(request_user.id) == str(user_id):
+            raise exceptions.UserPermissionDenied('Нельзя удалить собственный аккаунт')
+        if (str(request_user.id) == str(user.id) and request_user.is_active) or request_user.role == 'admin':
             await self._repository.delete(User.id == user_id)
             return
         raise exceptions.UserPermissionDenied(
             'Пользователь не имеет прав на это действие'
         )
 
-    async def update(self, user_id: UUID, request_user: UserRequest, user_to_update: UserUpdate) -> None:
+    async def update(self, user_id: UUID, request_user: UserRequest, user_to_update: UserUpdate) -> UserResponse:
         user = await self.get(User.id == user_id)
         request_user = await self.get(User.email == request_user.email)
         has_permission = (request_user.id == user.id and request_user.is_active) or request_user.role == 'admin'
         if not has_permission:
             raise exceptions.UserPermissionDenied('Пользователь не имеет прав на это действие')
         update_data = user_to_update.model_dump(exclude_unset=True)
-        await self._repository.update(
+        updated = await self._repository.update(
             User.id == user_id,
             **update_data
         )
+        return UserResponse.model_validate(updated, from_attributes=True)
 
     async def create(self, user_data: CreateUser) -> UserResponse:
         user_data = user_data.model_dump()

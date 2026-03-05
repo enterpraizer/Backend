@@ -1,7 +1,5 @@
 from uuid import UUID
-
 from fastapi import Depends, HTTPException, status
-
 from src.infrastructure.models.resource_quota import ResourceQuota
 from src.infrastructure.repositories.quotas import QuotaRepository, UsageRepository
 from src.infrastructure.schemas.users import UserRequest
@@ -29,7 +27,6 @@ class QuotaService:
     async def check_and_reserve(
         self, tenant_id: UUID, vcpu: int, ram_mb: int, disk_gb: int
     ) -> None:
-        """Validate current_usage + requested <= quota, then atomically increment usage."""
         quota = await self._quota.get_by_tenant(tenant_id)
         usage = await self._usage.get_by_tenant(tenant_id)
 
@@ -67,22 +64,22 @@ class QuotaService:
             "vcpu": {
                 "used": usage.used_vcpu,
                 "max": quota.max_vcpu,
-                "pct": round(usage.used_vcpu / quota.max_vcpu * 100, 1),
+                "pct": round(usage.used_vcpu / quota.max_vcpu * 100, 1) if quota.max_vcpu else 0,
             },
             "ram_mb": {
                 "used": usage.used_ram_mb,
                 "max": quota.max_ram_mb,
-                "pct": round(usage.used_ram_mb / quota.max_ram_mb * 100, 1),
+                "pct": round(usage.used_ram_mb / quota.max_ram_mb * 100, 1) if quota.max_ram_mb else 0,
             },
             "disk_gb": {
                 "used": usage.used_disk_gb,
                 "max": quota.max_disk_gb,
-                "pct": round(usage.used_disk_gb / quota.max_disk_gb * 100, 1),
+                "pct": round(usage.used_disk_gb / quota.max_disk_gb * 100, 1) if quota.max_disk_gb else 0,
             },
             "vms": {
                 "used": usage.used_vms,
                 "max": quota.max_vms,
-                "pct": round(usage.used_vms / quota.max_vms * 100, 1),
+                "pct": round(usage.used_vms / quota.max_vms * 100, 1) if quota.max_vms else 0,
             },
         }
 

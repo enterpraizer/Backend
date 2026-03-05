@@ -1,4 +1,5 @@
 from uuid import UUID
+import asyncio
 
 import docker
 from docker.errors import DockerException, NotFound
@@ -20,7 +21,7 @@ class HypervisorService:
         try:
             self._client = docker.from_env()
         except DockerException:
-            self._client = None  # graceful degradation if Docker not available
+            self._client = None
 
     def _container_name(self, vm_id: UUID, tenant_id: UUID) -> str:
         return f"vm-{str(tenant_id)[:8]}-{str(vm_id)[:8]}"
@@ -43,7 +44,8 @@ class HypervisorService:
             }
 
         volume_name = f"vm-{vm_id}-disk"
-        container = self._client.containers.run(
+        container = await asyncio.to_thread(
+            self._client.containers.run,
             image=HYPERVISOR_IMAGE,
             name=container_name,
             command="sleep infinity",
@@ -57,8 +59,7 @@ class HypervisorService:
                 "managed_by": "cloudiaas",
             },
         )
-        # Reload to get fresh network info after container start
-        container.reload()
+        await asyncio.to_thread(container.reload)
         networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
         ip = next(iter(networks.values()), {}).get("IPAddress", "") or "10.0.0.1"
         return {
@@ -70,30 +71,29 @@ class HypervisorService:
     async def start_vm(self, container_id: str) -> VMStatus:
         if not self._client or container_id.startswith("mock-"):
             return VMStatus.RUNNING
-        container = self._client.containers.get(container_id)
-        container.start()
+        container = await asyncio.to_thread(self._client.containers.get, container_id)
+        await asyncio.to_thread(container.start)
         return VMStatus.RUNNING
 
     async def stop_vm(self, container_id: str) -> VMStatus:
         if not self._client or container_id.startswith("mock-"):
             return VMStatus.STOPPED
-        container = self._client.containers.get(container_id)
-        container.stop(timeout=10)
+        container = await asyncio.to_thread(self._client.containers.get, container_id)
+        await asyncio.to_thread(container.stop, timeout=10)
         return VMStatus.STOPPED
 
     async def terminate_vm(self, container_id: str, vm_id: UUID) -> None:
-        """Stop + remove container + remove disk volume."""
         if not self._client or container_id.startswith("mock-"):
             return
         try:
-            container = self._client.containers.get(container_id)
-            container.stop(timeout=5)
-            container.remove(force=True)
+            container = await asyncio.to_thread(self._client.containers.get, container_id)
+            await asyncio.to_thread(container.stop, timeout=5)
+            await asyncio.to_thread(container.remove, force=True)
         except NotFound:
             pass
         try:
-            volume = self._client.volumes.get(f"vm-{vm_id}-disk")
-            volume.remove()
+            volume = await asyncio.to_thread(self._client.volumes.get, f"vm-{vm_id}-disk")
+            await asyncio.to_thread(volume.remove)
         except NotFound:
             pass
 
@@ -101,7 +101,7 @@ class HypervisorService:
         if not self._client or container_id.startswith("mock-"):
             return VMStatus.RUNNING
         try:
-            container = self._client.containers.get(container_id)
+            container = await asyncio.to_thread(self._client.containers.get, container_id)
             return _STATUS_MAP.get(container.status, VMStatus.STOPPED)
         except NotFound:
             return VMStatus.TERMINATED
@@ -109,7 +109,9 @@ class HypervisorService:
     async def list_tenant_containers(self, tenant_id: UUID) -> list[dict]:
         if not self._client:
             return []
-        containers = self._client.containers.list(
-            all=True, filters={"label": f"tenant_id={tenant_id}"}
+        containers = await asyncio.to_thread(
+            self._client.containers.list,
+            all=True,
+            filters={"label": f"tenant_id={tenant_id}"},
         )
         return [{"id": c.id, "name": c.name, "status": c.status} for c in containers]

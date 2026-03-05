@@ -60,3 +60,11 @@ class TenantRepository(BaseRepository):
         result = await self._session.execute(query)
         await self._session.flush()
         return result.scalar_one_or_none()
+
+    async def get_by_ids(self, ids: list[UUID]) -> list[Tenant]:
+        """Batch-fetch tenants by a list of IDs — avoids N+1 queries."""
+        if not ids:
+            return []
+        query = sa.select(self.table).where(self.table.id.in_(ids))
+        result = await self._session.execute(query)
+        return list(result.scalars().all())

@@ -159,13 +159,15 @@ def analyze_vm_optimizations() -> None:
         skipped = 0
         analyzed = 0
         for vm in vms:
-            # Skip if suggestion created in last 24h (check directly in sync session)
+            # Skip if a pending suggestion was created in last 30 min (avoid spam)
             from src.infrastructure.models.vm_suggestion import VmSuggestion
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            from src.infrastructure.models.vm_suggestion import SuggestionStatus
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
             recent = session.execute(
                 select(VmSuggestion).where(
                     VmSuggestion.vm_id == vm.id,
                     VmSuggestion.created_at >= cutoff,
+                    VmSuggestion.status == SuggestionStatus.PENDING,
                 ).limit(1)
             ).scalar_one_or_none()
 
@@ -184,7 +186,7 @@ def analyze_vm_optimizations() -> None:
                 )
             ).scalars().all()
 
-            if len(metrics) < 5:
+            if len(metrics) < 1:
                 skipped += 1
                 continue
 
@@ -263,3 +265,135 @@ def provision_vm_async(
         session.commit()
 
     logger.info("provision_vm_async: VM %s provisioned → RUNNING", vm_id)
+
+
+@celery_app.task(name="send_weekly_ai_report")
+def send_weekly_ai_report() -> None:
+    """
+    Weekly task (every Monday 9:00 MSK): send email digest of pending AI recommendations
+    to each tenant owner who has at least one pending VmSuggestion.
+    """
+    from src.infrastructure.models.vm_suggestion import VmSuggestion as Sugg, SuggestionStatus
+    from src.infrastructure.models.tenant import Tenant
+    from src.infrastructure.models.users import User
+
+    with Session(_sync_engine) as session:
+        # Fetch all pending suggestions joined with VM, Tenant, User (owner)
+        rows = session.execute(
+            select(Sugg, VirtualMachine, Tenant, User)
+            .join(VirtualMachine, Sugg.vm_id == VirtualMachine.id)
+            .join(Tenant, Sugg.tenant_id == Tenant.id)
+            .join(User, Tenant.owner_id == User.id)
+            .where(Sugg.status == SuggestionStatus.PENDING)
+            .order_by(Tenant.id, VirtualMachine.id)
+        ).all()
+
+    if not rows:
+        logger.info("send_weekly_ai_report: no pending suggestions, skipping")
+        return
+
+    # Group by user email → {vm_name → [suggestion]}
+    from collections import defaultdict
+    by_user: dict[str, dict] = defaultdict(lambda: {"name": "", "vms": defaultdict(list)})
+    for sugg, vm, tenant, user in rows:
+        rec = by_user[user.email]
+        rec["name"] = user.first_name or user.username
+        rec["vms"][f"{vm.name} (ID: {str(vm.id)[:8]})"].append({
+            "text": sugg.suggestion_text,
+            "confidence": int(sugg.confidence * 100),
+            "vm_id": str(vm.id),
+            "tenant_slug": tenant.slug,
+        })
+
+    sent = 0
+    for email_addr, data in by_user.items():
+        try:
+            html = _build_weekly_email_html(data["name"], data["vms"])
+            msg = EmailMessage()
+            msg["From"] = settings.email.username
+            msg["To"] = email_addr
+            msg["Subject"] = "☁️ Еженедельный отчёт ИИ-рекомендаций — CloudIaaS"
+            msg.set_content(
+                "Ваш почтовый клиент не поддерживает HTML. "
+                "Откройте приложение CloudIaaS для просмотра рекомендаций.",
+                subtype="plain",
+            )
+            msg.add_alternative(html, subtype="html")
+
+            with smtplib.SMTP(host=settings.email.host, port=settings.email.port) as smtp:
+                smtp.starttls()
+                smtp.login(settings.email.username, settings.email.password.get_secret_value())
+                smtp.send_message(msg)
+            sent += 1
+        except Exception as exc:
+            logger.error("send_weekly_ai_report: failed to send to %s — %s", email_addr, exc)
+
+    logger.info("send_weekly_ai_report: sent digest to %d users", sent)
+
+
+def _build_weekly_email_html(user_name: str, vms: dict) -> str:
+    """Build HTML body for the weekly AI recommendations digest email."""
+    vm_blocks = ""
+    for vm_label, suggestions in vms.items():
+        cards = ""
+        for s in suggestions:
+            confidence_color = "#16a34a" if s["confidence"] >= 80 else "#d97706" if s["confidence"] >= 60 else "#dc2626"
+            vm_url = f"{settings.frontend_url}/vms/{s['vm_id']}"
+            cards += f"""
+            <div style="background:#fef9c3;border-left:4px solid #f59e0b;border-radius:6px;padding:14px 16px;margin-bottom:12px;">
+              <p style="margin:0 0 8px 0;font-size:14px;color:#1c1917;">🤖 {s['text']}</p>
+              <span style="display:inline-block;background:{confidence_color};color:#fff;border-radius:12px;padding:2px 10px;font-size:12px;font-weight:600;">
+                Уверенность: {s['confidence']}%
+              </span>
+            </div>"""
+        vm_blocks += f"""
+        <div style="margin-bottom:24px;">
+          <h3 style="margin:0 0 10px 0;font-size:15px;color:#4f46e5;">🖥 {vm_label}</h3>
+          {cards}
+          <a href="{settings.frontend_url}/vms/{suggestions[0]['vm_id']}"
+             style="display:inline-block;margin-top:6px;background:#4f46e5;color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">
+            Открыть VM →
+          </a>
+        </div>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="ru">
+<head><meta charset="UTF-8"><title>ИИ-рекомендации CloudIaaS</title></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Inter,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#6d28d9,#4f46e5);padding:28px 32px;">
+            <h1 style="margin:0;color:#fff;font-size:22px;">✨ Еженедельные рекомендации ИИ</h1>
+            <p style="margin:6px 0 0;color:#c4b5fd;font-size:14px;">CloudIaaS · Автоматический анализ ваших виртуальных машин</p>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:28px 32px;">
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;">
+              Привет, <strong>{user_name}</strong>! 👋<br>
+              Вот что ИИ рекомендует для ваших виртуальных машин за последнюю неделю:
+            </p>
+            {vm_blocks}
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+            <p style="margin:0;font-size:13px;color:#6b7280;">
+              Вы получили это письмо, потому что являетесь владельцем рабочего пространства в CloudIaaS.<br>
+              Для управления уведомлениями перейдите в 
+              <a href="{settings.frontend_url}/profile" style="color:#4f46e5;">настройки профиля</a>.
+            </p>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f1f5f9;padding:16px 32px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">© 2025 CloudIaaS · Автоматическое сообщение</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""

@@ -1,9 +1,7 @@
 import ipaddress
 from typing import List
 from uuid import UUID
-
 from fastapi import Depends, HTTPException, status
-
 from src.application.services.audit_service import AuditService
 from src.infrastructure.models.virtual_network import VirtualNetwork
 from src.infrastructure.repositories.network import NetworkRepository
@@ -40,6 +38,7 @@ class NetworkService:
             cidr=data.cidr,
             is_public=data.is_public,
         )
+
         if user_id:
             await self._audit.log(
                 tenant_id=tenant_id, user_id=user_id,
@@ -74,7 +73,6 @@ class NetworkService:
             )
 
     async def attach_vm(self, network_id: UUID, vm_id: UUID, tenant_id: UUID) -> None:
-        # Both must belong to the same tenant
         network = await self._repo.get(VirtualNetwork.id == network_id, tenant_id=tenant_id)
         if not network:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")
